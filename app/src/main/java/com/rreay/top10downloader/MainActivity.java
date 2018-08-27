@@ -1,6 +1,7 @@
 package com.rreay.top10downloader;
 
 import android.os.AsyncTask;
+import android.os.PersistableBundle;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -22,6 +23,10 @@ public class MainActivity extends AppCompatActivity {
     private ListView listApps;
     private String feedUrl = "http://ax.itunes.apple.com/WebObjects/MZStoreServices.woa/ws/RSS/topfreeapplications/limit=%d/xml";  // changed limit=10 to limit=%d. A way of specifying an integer value that will be replaced by an actual value by the String.format method.
     private int feedLimit = 10;
+    private String feedCachedUrl = "INVALIDATED";
+    public static final String STATE_URL = "feedUrl";
+    public static final String STATE_LIMIT = "feedLimit";
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -29,7 +34,14 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         listApps = findViewById(R.id.xmlListView);
 
-        downloadUrl("http://ax.itunes.apple.com/WebObjects/MZStoreServices.woa/ws/RSS/topfreeapplications/limit=10/xml");
+        // since we are using a bundle, this will check that the bundle isn't null
+        if(savedInstanceState != null) {
+            feedUrl = savedInstanceState.getString(STATE_URL);
+            feedLimit = savedInstanceState.getInt(STATE_LIMIT);
+        }
+
+        // passes the string provided in feedUrl as well as the feedLimit
+        downloadUrl(String.format(feedUrl, feedLimit));
 
 //        Log.d(TAG, "onCreate: starting AsyncTask");
 //        DownloadData downloadData = new DownloadData();
@@ -42,6 +54,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.feeds_menu, menu);
+        // Write code to set correct menu limit once you've restored the feedLimit value
+        if(feedLimit == 10){
+            menu.findItem(R.id.mnu10).setChecked(true);
+        }else{
+            menu.findItem(R.id.mnu25).setChecked(true);
+        }
         return true;
     }
 
@@ -49,35 +67,60 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
-        String feedUrl;
 
-        switch(id){
+        switch (id) {
             case R.id.mnuFree:
-                feedUrl = "http://ax.itunes.apple.com/WebObjects/MZStoreServices.woa/ws/RSS/topfreeapplications/limit=10/xml";
+                feedUrl = "http://ax.itunes.apple.com/WebObjects/MZStoreServices.woa/ws/RSS/topfreeapplications/limit=%d/xml";
                 break;
             case R.id.mnuPaid:
-                feedUrl = "http://ax.itunes.apple.com/WebObjects/MZStoreServices.woa/ws/RSS/toppaidapplications/limit=10/xml";
+                feedUrl = "http://ax.itunes.apple.com/WebObjects/MZStoreServices.woa/ws/RSS/toppaidapplications/limit=%d/xml";
                 break;
             case R.id.mnuSongs:
-                feedUrl = "http://ax.itunes.apple.com/WebObjects/MZStoreServices.woa/ws/RSS/topsongs/limit=10/xml";
+                feedUrl = "http://ax.itunes.apple.com/WebObjects/MZStoreServices.woa/ws/RSS/topsongs/limit=%d/xml";
                 break;
             case R.id.mnuAlbums:
-                feedUrl = "http://ax.itunes.apple.com/WebObjects/MZStoreServices.woa/ws/RSS/topalbums/limit=10/xml";
+                feedUrl = "http://ax.itunes.apple.com/WebObjects/MZStoreServices.woa/ws/RSS/topalbums/limit=%d/xml";
                 break;
-                default: // this line is important and should always be added in. Possible to create submenus and android triggers a call to this method when the sub menus open.
-                    return super.onOptionsItemSelected(item);
+            case R.id.mnu10:
+            case R.id.mnu25:
+                if (!item.isChecked()) {
+                    item.setChecked(true);
+                    feedLimit = 35 - feedLimit; // since feedLimit = 10, if activated 35 - 10 is 25
+                    Log.d(TAG, "onOptionsItemSelected: " + item.getTitle() + " setting feedLimit to " + feedLimit);
+                } else {
+                    Log.d(TAG, "onOptionsItemSelected: " + item.getTitle() + " feedLimit unchanged");
+                }
+                break;
+            case R.id.mnuRefresh:
+                feedCachedUrl = "INVALIDATED";
+                break;
+            default: // this line is important and should always be added in. Possible to create submenus and android triggers a call to this method when the sub menus open.
+                return super.onOptionsItemSelected(item);
 
         }
-        downloadUrl(feedUrl);
+        downloadUrl(String.format(feedUrl, feedLimit));
         return true;
 
     }
 
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        outState.putString(STATE_URL, feedUrl);
+        outState.putInt(STATE_LIMIT, feedLimit);
+        super.onSaveInstanceState(outState);
+    }
+
     private void downloadUrl(String feedUrl) {
-        Log.d(TAG, "downloadUrl: starting AsyncTask");
-        DownloadData downloadData = new DownloadData();
-        downloadData.execute(feedUrl);
-        Log.d(TAG, "onCreate: done");
+        // add code in "if" statement below to prevent from url downloading unnecessarily
+        if (!feedUrl.equalsIgnoreCase(feedCachedUrl)) {
+            Log.d(TAG, "downloadUrl: starting AsyncTask");
+            DownloadData downloadData = new DownloadData();
+            downloadData.execute(feedUrl);
+            feedCachedUrl = feedUrl; // this checks to confirm we're not redownloading the same url again
+            Log.d(TAG, "onCreate: done");
+        }else{
+            Log.d(TAG, "downloadUrl: URL not changed");
+        }
 
     }
 
@@ -97,7 +140,9 @@ public class MainActivity extends AppCompatActivity {
         private static final String TAG = "DownloadData";
 
 
-        /** Will enter ArrayAdapter under onPostExecute method**/
+        /**
+         * Will enter ArrayAdapter under onPostExecute method
+         **/
         @Override
         protected void onPostExecute(String s) {
             super.onPostExecute(s);
@@ -156,7 +201,7 @@ public class MainActivity extends AppCompatActivity {
          * <p>
          * One more exception to deal with. Android requires app to be granted permissions to do certain things, such as access the internet.
          * Read data in an append it to the Buffer. Will set up a character array that is filled with characters from the buffer.
-         *
+         * <p>
          * NOTE: ADDED INTERNET ACCESS PERMISSION IN MANIFEST FILE
          **/
 
@@ -195,7 +240,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.e(TAG, "downloadXML: Invalid URL " + e.getMessage());
             } catch (IOException e) {
                 Log.e(TAG, "downloadXML: IO Exception reading data: " + e.getMessage());
-            }catch(SecurityException e){
+            } catch (SecurityException e) {
                 Log.e(TAG, "downloadXML: Security Exception. Needs permission? " + e.getMessage());
 //                e.printStackTrace(); // will print the entire stack trace in the catch block
             }

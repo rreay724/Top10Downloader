@@ -3,6 +3,7 @@ package com.rreay.top10downloader;
 import android.content.Context;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -52,11 +53,13 @@ public class FeedAdapter extends ArrayAdapter {
         /** This will set it so we reuse views and saves memory. It will only create a new view if it is null.
          We are only creating a new view if a view is null and then we are given another view to use**/
         if (convertView == null) {
+            Log.d(TAG, "getView: called with null convertView");
             convertView = layoutInflater.inflate(layoutResource, parent, false);
 
             viewHolder = new ViewHolder(convertView);
             convertView.setTag(viewHolder);
         } else {
+            Log.d(TAG, "getView: provided a convertView");
             viewHolder = (ViewHolder) convertView.getTag();
         }
 //        TextView tvName = convertView.findViewById(R.id.tvName);
